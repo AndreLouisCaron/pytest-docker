@@ -21,7 +21,11 @@ def execute(command, success_codes=(0,)):
         output = error.output or b''
         status = error.returncode
         command = error.cmd
-    output = output.decode('utf-8')
+    try:
+        output = output.decode('utf-8')
+    except UnicodeDecodeError:
+        # Decoding utf-8 from console output may fail (Windows & Python<3.6)
+        pass
     if status not in success_codes:
         raise Exception(
             'Command %r returned %d: """%s""".' % (command, status, output)
@@ -65,7 +69,8 @@ class Services(object):
         output = self._docker_compose.execute(
             'port %s %d' % (service, port,)
         )
-        endpoint = output.strip()
+        # Strip output from newlines and ANSI color codes
+        endpoint = re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', output).strip()
         if not endpoint:
             raise ValueError(
                 'Could not detect port for "%s:%d".' % (service, port)
